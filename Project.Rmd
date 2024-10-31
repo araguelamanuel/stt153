@@ -1,0 +1,204 @@
+---
+title: "Project"
+author: "Valiao, Syrelle Kaye D."
+date: "2024-09-24"
+output: pdf_document
+---
+
+```{r libraries}
+library(tidyverse)
+library(forecast)
+library(fpp3)
+library(ggplot2)
+```
+
+```{r}
+data <- X2023_Respiratory_Virus_Response_NSSP_Emergency_Department_Visit_Trajectories_by_State_and_Sub_State_Regions_COVID_19_Flu_RSV_Combined_
+
+glimpse(data)
+
+edv <- data |> filter(geography == "Texas")
+
+edv |> ggplot(aes(x=week_end, y=percent_visits_combined)) +
+  geom_line()
+
+edv |> ggplot(aes(x=week_end, y=percent_visits_influenza)) +
+  geom_line()
+
+edv |> ggplot(aes(x=week_end, y=percent_visits_covid)) +
+  geom_line()
+
+edv_ts <- ts(edv$percent_visits_combined, start = c(2022, 10), frequency = 52)
+
+library(tseries)
+edv_ts <- na.remove(edv_ts)
+
+```
+
+```{r}
+autoplot(edv_ts)
+
+autoplot(decompose(edv_ts))
+
+autoplot(decompose(edv_ts)$trend)
+
+autoplot(decompose(edv_ts)$seasonal)
+
+autoplot(decompose(edv_ts)$random)
+```
+
+```{r}
+ma_52 <- ma(edv_ts, 52)
+autoplot(ma_52)
+
+ma_2 <- ma(edv_ts, 2)
+autoplot(ma_2)
+
+ma_3 <- ma(edv_ts, 3)
+autoplot(ma_3)
+
+ma_7 <- ma(edv_ts, 7)
+autoplot(ma_7)
+
+(edv1 <- window(edv_ts,start=c(2022, 10)))
+(ma7 <- ma(edv1, order=7, centre=FALSE))
+(ma2x7 <- ma(edv1, order=7, centre=TRUE))
+
+autoplot(ma7)
+autoplot(ma2x7)
+```
+
+
+```{r}
+autoplot(edv_ts, series="Data") +
+  autolayer(ma(edv_ts,7), series="7-MA") +
+  xlab("Week") + ylab("Percent Visits Combined") +
+  ggtitle("Emergency Department Visits") +
+  scale_colour_manual(values=c("Data"="grey50","7-MA"="red"),
+                      breaks=c("Data","7-MA"))
+```
+
+```{r}
+edv_ts |> decompose(type="additive") |> 
+  autoplot() + xlab("Week") +
+  ggtitle("Classical additive decomposition
+    of Emergency Department Visits")
+
+edv_ts |> decompose(type="multiplicative") |> 
+  autoplot() + xlab("Week") +
+  ggtitle("Classical multiplicative decomposition
+    of Emergency Department Visits")
+
+```
+
+```{r}
+edv_ts |> 
+  stl(t.window=13, s.window="periodic", robust=TRUE) |> 
+  autoplot()
+
+edv_ts |> 
+  stl(t.window=7, s.window="periodic", robust=TRUE) |> 
+  autoplot()
+
+```
+
+```{r}
+fit <- stl(edv_ts, t.window=7, s.window="periodic",
+  robust=TRUE)
+fit |>  seasadj() |>  naive() |> 
+  autoplot() + ylab("Percent visits combined") +
+  ggtitle("Naive forecasts of seasonally adjusted data")
+
+fit |>  forecast(method="naive") |> 
+  autoplot() + ylab("Percent visits combined")
+
+fcast <- stlf(edv_ts, method='naive')
+autoplot(fcast)
+
+fcast2 <- stlf(edv_ts, method='rwdrift')
+autoplot(fcast2)
+```
+
+
+```{r}
+library(dplyr)
+
+new_tibble <- edv |> 
+  select(week_end, percent_visits_influenza)
+
+glimpse(new_tibble)
+
+new_tibble_ts <- ts(new_tibble, start = c(2022, 10), end = c(2024, 8), frequency = 52)
+
+new_tibble_ts <- na.remove(edv_ts)
+
+autoplot(new_tibble_ts)
+
+plot(decompose(new_tibble_ts))
+
+plot(decompose(new_tibble_ts)$trend)
+
+plot(decompose(new_tibble_ts)$seasonal)
+
+plot(decompose(new_tibble_ts)$random)
+```
+
+```{r}
+tc <- ma(edv_ts, 52)
+autoplot(tc) 
+
+dt = edv_ts - tc
+autoplot(dt)
+
+dtm = edv_ts/tc
+autoplot(dtm)
+```
+
+```{r}
+(fit <- auto.arima(edv_ts, seasonal = FALSE))
+
+fit |> forecast(h=10) |> autoplot(include=80)
+```
+
+```{r}
+ggAcf(edv_ts)
+ggPacf(edv_ts)
+```
+
+```{r}
+(fit2 <- auto.arima(edv_ts, seasonal=FALSE,
+  stepwise=FALSE, approximation=FALSE))
+```
+
+
+```{r}
+split_point <- floor(0.7 * length(new_tibble_ts))  # Using 70-30 split
+
+train_ts <- window(new_tibble_ts, end = c(time(new_tibble_ts)[split_point]))
+test_ts <- window(new_tibble_ts, start = c(time(new_tibble_ts)[split_point + 1]))
+
+plot(train_ts, main = "Training Data", ylab = "Percent Visits Influenza", xlab = "Week")
+plot(test_ts, main = "Testing Data", ylab = "Percent Visits Influenza", xlab = "Week")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
